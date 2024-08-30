@@ -49,6 +49,10 @@ public class SimpleSFM : FSM
     public float attackRadius = 200f;
     public float playerNearRadius = 300f;
 
+    // Tank Turrent
+    public Transform turret;
+    public Transform bulletSpawnPoint;
+
     // Start is called before the first frame update
     void Start()
     {
@@ -95,7 +99,7 @@ public class SimpleSFM : FSM
                 UpdateAttackState();
                 break;
             case FSMState.Dead:
-                UpdateDeatState();
+                UpdateDeadState();
                 break;
         }
 
@@ -109,19 +113,64 @@ public class SimpleSFM : FSM
         }
     }
 
-    private void UpdateDeatState()
+    private void UpdateDeadState()
     {
         
     }
 
-    private void UpdateAttackState()
+    protected void UpdateAttackState()
     {
-        
+        //Set the target position as the player position
+        destPos = playerTransform.position;
+
+        //Check the distance with the player tank
+        float dist = Vector3.Distance(transform.position, playerTransform.position);
+        if (dist >= 200.0f && dist < 300.0f)
+        {
+            //Rotate to the target point
+            Quaternion targetRotation = Quaternion.LookRotation(destPos - transform.position);
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * curRotSpeed);
+
+            //Go Forward
+            transform.Translate(Vector3.forward * Time.deltaTime * curSpeed);
+
+            curState = FSMState.Attack;
+        }
+        //Transition to patrol is the tank become too far
+        else if (dist >= 300.0f)
+        {
+            curState = FSMState.Patrol;
+        }
+
+        //Always Turn the turret towards the player
+        Quaternion turretRotation = Quaternion.LookRotation(destPos - turret.position);
+        turret.rotation = Quaternion.Slerp(turret.rotation, turretRotation, Time.deltaTime * curRotSpeed);
+
+        //Shoot the bullets
+        ShootBullet();
+    }
+
+    private void ShootBullet()
+    {
+        throw new System.NotImplementedException();
     }
 
     private void UpdateChaseState()
     {
-        
+        // Set the target position as the player position
+        destPos = playerTransform.position;
+
+        // Check the distance with player tank when the distance is near, transition to attack state
+        float dist = Vector3.Distance(transform.position, playerTransform.position);
+        if(dist <= attackRadius)
+        {
+            curState = FSMState.Attack;
+        } else if(dist >= playerNearRadius)
+        {
+            curState = FSMState.Patrol;
+        }
+
+        transform.Translate(Vector3.forward * Time.deltaTime * curSpeed);
     }
 
     private void UpdatePatrolState()
@@ -150,8 +199,24 @@ public class SimpleSFM : FSM
         int rndIndex = Random.Range(0, poinList.Length);
         float rndRadius = 10f;
         Vector3 rndPosition = Vector3.zero;
-
         destPos = poinList[rndIndex].transform.position + rndPosition;
+        
+        // Check Range to decide the random point as the same as before
+        if(IsCurrentRange(destPos))
+        {
+            rndPosition = new Vector3(Random.Range(-rndRadius, rndRadius), 0, Random.Range(-rndRadius, rndRadius));
+            destPos = poinList[rndIndex].transform.position + rndPosition;
+        }
 
+
+    }
+
+    private bool IsCurrentRange(Vector3 pos)
+    {
+        float xPos = Mathf.Abs(pos.x - transform.position.x);
+        float zPos = Mathf.Abs(pos.z - transform.position.z);
+
+        if (xPos <= 50 && zPos <= 50) return true;
+        return false;
     }
 }
