@@ -28,16 +28,18 @@ public class SimpleSFM : FSM
     private int health = 100;
 
     // We overwrite the deprecated built-in rigdbody
+    [SerializeField]
     protected Rigidbody rigidbody;
 
     // Player Transform
+    [SerializeField]
     protected Transform playerTransform;
 
     // Next destination position of the NPC Tank
     protected Vector3 destPos;
 
     // List of points for patrolling;
-    protected GameObject[] poinList;
+    protected GameObject[] pointList;
 
     // Buttet shooting rate
     protected float shootRate = 3f;
@@ -54,30 +56,24 @@ public class SimpleSFM : FSM
     public Transform bulletSpawnPoint;
 
     // Start is called before the first frame update
-    void Start()
-    {
-        
-    }
-
-    // Update is called once per frame
-    void Update()
-    {
-        
-    }
-
+    
+   
     protected override void Initialize()
     {
-        // Get the list of points
-        poinList = GameObject.FindGameObjectsWithTag("WandarPoint");
-
-        // Set Random destination point first
-        FindNextPoint();
-
+        Debug.Log("hi");
         // Get the target enemy(Player)
         GameObject objPlayer = GameObject.FindGameObjectWithTag("Player");
 
         // Get the rigidbody
         rigidbody = GetComponent<Rigidbody>();
+
+        // Get the list of points
+        pointList = GameObject.FindGameObjectsWithTag("WandarPoint");
+
+        // Set Random destination point first
+        FindNextPoint();
+
+        
         playerTransform = objPlayer.transform;
         if(!playerTransform)
         {
@@ -115,7 +111,24 @@ public class SimpleSFM : FSM
 
     private void UpdateDeadState()
     {
-        
+        if(!bDead)
+        {
+            bDead = true;
+            Explode();
+        }
+    }
+
+    private void Explode()
+    {
+        float rndX = Random.Range(10.0f, 10.0f);
+        float rndZ = Random.Range(10f, 30f);
+        for(int i = 0; i < 3; i++)
+        {
+            rigidbody.AddExplosionForce(10000f, transform.position - new Vector3(rndX, 10f, rndZ), 40, 10);
+            rigidbody.velocity = transform.TransformDirection(new Vector3(rndX, 20, rndZ));
+
+        }
+        Destroy(gameObject, 1.5f);
     }
 
     protected void UpdateAttackState()
@@ -152,7 +165,11 @@ public class SimpleSFM : FSM
 
     private void ShootBullet()
     {
-        throw new System.NotImplementedException();
+        if(elapsedTime >= shootRate)
+        {
+            Instantiate(Bullet, bulletSpawnPoint.position, bulletSpawnPoint.rotation);
+            elapsedTime = 0;
+        }
     }
 
     private void UpdateChaseState()
@@ -187,29 +204,36 @@ public class SimpleSFM : FSM
             curState = FSMState.Chase;
         }
 
-        // Rotate to the target point
+        // Rotate to the target point 
         Quaternion targetRotation = Quaternion.LookRotation(destPos - transform.position);
-        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * curRotSpeed);
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation,Time.deltaTime * curRotSpeed);
+        // Go Forward
+        transform.Translate(Vector3.forward * Time.deltaTime *
+        curSpeed);
 
     }
 
     private void FindNextPoint()
     {
-        print("Finding next point");
-        int rndIndex = Random.Range(0, poinList.Length);
-        float rndRadius = 10f;
-        Vector3 rndPosition = Vector3.zero;
-        destPos = poinList[rndIndex].transform.position + rndPosition;
-        
-        // Check Range to decide the random point as the same as before
-        if(IsCurrentRange(destPos))
+        if (pointList == null || pointList.Length == 0)
         {
-            rndPosition = new Vector3(Random.Range(-rndRadius, rndRadius), 0, Random.Range(-rndRadius, rndRadius));
-            destPos = poinList[rndIndex].transform.position + rndPosition;
+            Debug.LogError("No wander points found. Ensure that objects are tagged as 'WandarPoint'.");
+            return;
         }
 
+        print("Finding next point");
+        int rndIndex = Random.Range(0, pointList.Length);
+        float rndRadius = 10.0f;
+        Vector3 rndPosition = Vector3.zero;
+        destPos = pointList[rndIndex].transform.position + rndPosition;
 
+        if (IsCurrentRange(destPos))
+        {
+            rndPosition = new Vector3(Random.Range(-rndRadius, rndRadius), 0.0f, Random.Range(-rndRadius, rndRadius));
+            destPos = pointList[rndIndex].transform.position + rndPosition;
+        }
     }
+
 
     private bool IsCurrentRange(Vector3 pos)
     {
@@ -218,5 +242,13 @@ public class SimpleSFM : FSM
 
         if (xPos <= 50 && zPos <= 50) return true;
         return false;
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        if(collision.gameObject.tag == "Bullet")
+        {
+            health -= collision.gameObject.GetComponent<Bullet>().damage;
+        }
     }
 }
